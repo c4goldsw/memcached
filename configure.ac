@@ -675,5 +675,11 @@ then
   CFLAGS="$CFLAGS -errfmt=error -errwarn -errshort=tags"
 fi
 
+# CG: Lazily adding flags
+LIBS="$LIBS -latlas -l:libJudy.a -lstdc++"
+LDFLAGS="$LDFLAGS -L../Atlas/runtime/build/lib/ -v"
+CFLAGS="$CFLAGS -I../Atlas/runtime/include/ -Xclang -load -Xclang ../Atlas/compiler-plugin/plugin_build/NvmInstrumenter.so -Qunused-arguments"
+CC=clang
+
 AC_CONFIG_FILES(Makefile doc/Makefile)
 AC_OUTPUT

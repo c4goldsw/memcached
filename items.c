@@ -6,6 +6,7 @@
 #include "storage.h"
 #include "slab_automove_extstore.h"
 #endif
+#include "persist.h"
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/resource.h>
@@ -1540,6 +1541,9 @@ static pthread_t lru_maintainer_tid;
 #define MIN_LRU_MAINTAINER_SLEEP 1000
 
 static void *lru_maintainer_thread(void *arg) {
+    /* CG */
+    ingot_init_thread();
+
     slab_automove_reg_t *sam = &slab_automove_default;
 #ifdef EXTSTORE
     void *storage = arg;

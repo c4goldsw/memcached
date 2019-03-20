@@ -1,6 +1,7 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 
 // FIXME: config.h?
+#include "persist.h"
 #include <stdint.h>
 #include <stdbool.h>
 // end FIXME
@@ -15,6 +16,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+/* CG: I'm copying this based off what's in redis/src/bio.c, where this include
+ * format is used to import nvm_release / acquire, for instrumenting 
+ * pthread_cond_wait() manually */
+#include <ingot.h>
+
+void nvm_release(void * lock_address);
+void nvm_acquire(void * lock_address);
+/* CG: end funny import section */
 #include "extstore.h"
 
 // TODO: better if an init option turns this on/off.
@@ -704,13 +713,19 @@ static inline int _read_from_wbuf(store_page *p, obj_io *io) {
  */
 // FIXME: protect from reading past page
 static void *extstore_io_thread(void *arg) {
+
+    /* CG */
+    ingot_init_thread();
+
     store_io_thread *me = (store_io_thread *)arg;
     store_engine *e = me->e;
     while (1) {
         obj_io *io_stack = NULL;
         pthread_mutex_lock(&me->mutex);
         if (me->queue == NULL) {
+            nvm_release(&me->mutex);
             pthread_cond_wait(&me->cond, &me->mutex);
+            nvm_acquire(&me->mutex);
         }
 
         // Pull and disconnect a batch from the queue
@@ -872,7 +887,9 @@ static void *extstore_maint_thread(void *arg) {
         unsigned int low_page = 0;
         uint64_t low_version = ULLONG_MAX;
 
+        nvm_release(&me->mutex);
         pthread_cond_wait(&me->cond, &me->mutex);
+        nvm_acquire(&me->mutex);
         pthread_mutex_lock(&e->mutex);
         // default freelist requires at least one page free.
         // specialized freelists fall back to default once full.

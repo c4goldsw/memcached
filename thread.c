@@ -6,12 +6,21 @@
 #ifdef EXTSTORE
 #include "storage.h"
 #endif
+#include "persist.h"
 #include <assert.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+/* CG: I'm copying this based off what's in redis/src/bio.c, where this include
+ * format is used to import nvm_release / acquire, for instrumenting 
+ * pthread_cond_wait() manually */
+#include <ingot.h>
+
+void nvm_release(void * lock_address);
+void nvm_acquire(void * lock_address);
+/* CG: end funny import section */
 
 #ifdef __sun
 #include <atomic.h>
@@ -117,7 +126,9 @@ void item_unlock(uint32_t hv) {
 
 static void wait_for_thread_registration(int nthreads) {
     while (init_count < nthreads) {
+        nvm_release(&init_lock);
         pthread_cond_wait(&init_cond, &init_lock);
+        nvm_acquire(&init_lock);
     }
 }
 
@@ -280,6 +291,32 @@ static void cqi_free(CQ_ITEM *item) {
     pthread_mutex_unlock(&cqi_freelist_lock);
 }
 
+/*
+ * CG: wrap
+ */
+
+typedef struct wrapper_arg {
+    void *(*func)(void *);
+    void *arg;
+} ingot_init_wrapper_arg;
+
+/* CG: Not needed, but the compiler throws an error otherwise */
+void *ingot_init_wrapper(void *arg);
+
+void *ingot_init_wrapper(void *arg) {
+    ingot_init_wrapper_arg *wrapped_arg = arg;
+    void *thrd_arg = wrapped_arg->arg;
+    void *(*fn)(void *) = wrapped_arg->func;
+
+    // Free the wrapper now, lest a thread has a different exit path
+    free(wrapped_arg);
+
+    // Initialize this thread for use in Ingot
+    ingot_init_thread();
+
+    // Finally, call the desired function
+    return fn(thrd_arg);
+}
 
 /*
  * Creates a worker thread.

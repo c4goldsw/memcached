@@ -1,5 +1,6 @@
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "memcached.h"
+#include "persist.h"
 #ifdef EXTSTORE
 
 #include "storage.h"
@@ -117,6 +118,9 @@ static pthread_mutex_t storage_write_plock;
 #define WRITE_SLEEP_MIN 500
 
 static void *storage_write_thread(void *arg) {
+    /* CG */
+    ingot_init_thread();
+
     void *storage = arg;
     // NOTE: ignoring overflow since that would take years of uptime in a
     // specific load pattern of never going to sleep.
@@ -439,6 +443,9 @@ static void *storage_compact_thread(void *arg) {
     bool drop_unread = false;
     char *readback_buf = NULL;
     struct storage_compact_wrap wrap;
+
+    /* CG */
+    ingot_init_thread();
 
     logger *l = logger_create();
     if (l == NULL) {

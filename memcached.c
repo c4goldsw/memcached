@@ -17,6 +17,7 @@
 #ifdef EXTSTORE
 #include "storage.h"
 #endif
+#include "persist.h" // CG
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -26,6 +27,8 @@
 #include <sys/uio.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include <atlas_api.h> // CG
+#include <atlas_alloc.h>
 
 /* some POSIX systems need the following definition
  * to get mlockall flags out of sys/mman.h.  */
@@ -66,6 +69,10 @@
 #endif
 #endif
 #endif
+
+/* CG: provide the definition of various Ingot related variables */
+int pmregion = -1;
+root *root_ptr = NULL;
 
 /*
  * forward declarations
@@ -332,6 +339,9 @@ static pthread_t conn_timeout_tid;
 #define CONNS_PER_SLICE 100
 #define TIMEOUT_MSG_SIZE (1 + sizeof(int))
 static void *conn_timeout_thread(void *arg) {
+    /* CG */
+    ingot_init_thread();
+
     int i;
     conn *c;
     char buf[TIMEOUT_MSG_SIZE];
@@ -7633,6 +7643,15 @@ int main (int argc, char **argv) {
 #endif
     }
 
+    /* CG: This seems like a good place to start off instrumenting everything.
+    Copies code from server.c in ingot-redis */
+    int is_created;
+    uint32_t pmregion;
+
+    NVM_Initialize();
+    pmregion = NVM_FindOrCreateRegion("persistent-mem", O_RDWR, &is_created);
+    set_pr(pmregion); // Note to self: this is an ingot call
+
     /* initialize main thread libevent instance */
 #if defined(LIBEVENT_VERSION_NUMBER) && LIBEVENT_VERSION_NUMBER >= 0x02000101
     /* If libevent version is larger/equal to 2.0.2-alpha, use newer version */
@@ -7646,13 +7665,27 @@ int main (int argc, char **argv) {
     main_base = event_init();
 #endif
 
+    /* CG: Start marking the allocations */
+    if (is_created) {
+        nvm_begin_durable();
+        root_ptr = persistent_alloc(sizeof(root_ptr), PT_serverRoot, pmregion);
+        NVM_SetRegionRoot(pmregion, root_ptr);
+    } else {
+        root_ptr = NVM_GetRegionRoot(pmregion);
+    }
+
+    /* CG: end persistent allocations */
+    if(is_created) {
+        nvm_end_durable();
+    }
+
     /* initialize other stuff */
     logger_init();
     stats_init();
     assoc_init(settings.hashpower_init);
     conn_init();
     slabs_init(settings.maxbytes, settings.factor, preallocate,
-            use_slab_sizes ? slab_sizes : NULL);
+            use_slab_sizes ? slab_sizes : NULL, is_created);
 #ifdef EXTSTORE
     if (storage_file) {
         enum extstore_res eres;
@@ -7832,6 +7865,9 @@ int main (int argc, char **argv) {
 
     /* cleanup base */
     event_base_free(main_base);
+
+    /* CG: Seems like a good place to call this */
+    NVM_Finalize();
 
     return retval;
 }

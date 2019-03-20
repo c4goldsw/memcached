@@ -6,6 +6,7 @@
 
 /* -*- Mode: C; tab-width: 4; c-basic-offset: 4; indent-tabs-mode: nil -*- */
 #include "memcached.h"
+#include "persist.h"
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/resource.h>
@@ -20,6 +21,14 @@
 #include <assert.h>
 #include <unistd.h>
 #include <poll.h>
+/* CG: I'm copying this based off what's in redis/src/bio.c, where this include
+ * format is used to import nvm_release / acquire, for instrumenting 
+ * pthread_cond_wait() manually */
+#include <ingot.h>
+
+void nvm_release(void * lock_address);
+void nvm_acquire(void * lock_address);
+/* CG: end funny import section */
 
 #define LARGEST_ID POWER_LARGEST
 
@@ -354,13 +363,18 @@ static void *item_crawler_thread(void *arg) {
     int i;
     int crawls_persleep = settings.crawls_persleep;
 
+    /* CG */
+    ingot_init_thread();
+
     pthread_mutex_lock(&lru_crawler_lock);
     pthread_cond_signal(&lru_crawler_cond);
     settings.lru_crawler = true;
     if (settings.verbose > 2)
         fprintf(stderr, "Starting LRU crawler background thread\n");
     while (do_run_lru_crawler_thread) {
+    nvm_release(&lru_crawler_lock);
     pthread_cond_wait(&lru_crawler_cond, &lru_crawler_lock);
+    nvm_acquire(&lru_crawler_lock);
 
     while (crawler_count) {
         item *search = NULL;
@@ -506,7 +520,9 @@ int start_item_crawler_thread(void) {
         return -1;
     }
     /* Avoid returning until the crawler has actually started */
+    nvm_release(&lru_crawler_lock);
     pthread_cond_wait(&lru_crawler_cond, &lru_crawler_lock);
+    nvm_acquire(&lru_crawler_lock);
     pthread_mutex_unlock(&lru_crawler_lock);
 
     return 0;

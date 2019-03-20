@@ -22,6 +22,7 @@
 #include "cache.h"
 #include "util.h"
 #include "protocol_binary.h"
+#include "persist.h"
 
 #define TMP_TEMPLATE "/tmp/test_file.XXXXXXX"
 
@@ -1706,6 +1707,9 @@ static enum test_return test_binary_illegal(void) {
 volatile bool hickup_thread_running;
 
 static void *binary_hickup_recv_verification_thread(void *arg) {
+    /* CG */
+    ingot_init_thread();
+
     protocol_binary_response_no_extras *response = malloc(65*1024);
     if (response != NULL) {
         while (safe_recv_packet(response, 65*1024)) {

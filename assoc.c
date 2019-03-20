@@ -12,6 +12,7 @@
  */
 
 #include "memcached.h"
+#include "persist.h"
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/resource.h>
@@ -24,6 +25,14 @@
 #include <string.h>
 #include <assert.h>
 #include <pthread.h>
+/* CG: I'm copying this based off what's in redis/src/bio.c, where this include
+ * format is used to import nvm_release / acquire, for instrumenting 
+ * pthread_cond_wait() manually */
+#include <ingot.h>
+
+void nvm_release(void * lock_address);
+void nvm_acquire(void * lock_address);
+/* CG: end funny import section */
 
 static pthread_cond_t maintenance_cond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t maintenance_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -198,6 +207,9 @@ int hash_bulk_move = DEFAULT_HASH_BULK_MOVE;
 
 static void *assoc_maintenance_thread(void *arg) {
 
+    /* CG */
+    ingot_init_thread();
+
     mutex_lock(&maintenance_lock);
     while (do_run_maintenance_thread) {
         int ii = 0;
@@ -247,7 +259,9 @@ static void *assoc_maintenance_thread(void *arg) {
         if (!expanding) {
             /* We are done expanding.. just wait for next invocation */
             started_expanding = false;
+            nvm_release(&maintenance_lock);
             pthread_cond_wait(&maintenance_cond, &maintenance_lock);
+            nvm_acquire(&maintenance_lock);
             /* assoc_expand() swaps out the hash table entirely, so we need
              * all threads to not hold any references related to the hash
              * table while this happens.

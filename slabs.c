@@ -8,6 +8,7 @@
  * memcached protocol.
  */
 #include "memcached.h"
+#include "persist.h"
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -21,6 +22,14 @@
 #include <signal.h>
 #include <assert.h>
 #include <pthread.h>
+/* CG: I'm copying this based off what's in redis/src/bio.c, where this include
+ * format is used to import nvm_release / acquire, for instrumenting 
+ * pthread_cond_wait() manually */
+#include <ingot.h>
+
+void nvm_release(void * lock_address);
+void nvm_acquire(void * lock_address);
+/* CG: end funny import section */
 
 //#define DEBUG_SLAB_MOVER
 /* powers-of-N allocation structures */
@@ -154,7 +163,8 @@ static void * alloc_large_chunk_linux(const size_t limit)
  * Determines the chunk sizes and initializes the slab class descriptors
  * accordingly.
  */
-void slabs_init(const size_t limit, const double factor, const bool prealloc, const uint32_t *slab_sizes) {
+void slabs_init(const size_t limit, const double factor, const bool prealloc,
+                const uint32_t *slab_sizes, int pmregion_just_created) {
     int i = POWER_SMALLEST - 1;
     unsigned int size = sizeof(item) + settings.chunk_size;
 
@@ -167,6 +177,11 @@ void slabs_init(const size_t limit, const double factor, const bool prealloc, co
     mem_limit = limit;
 
     if (prealloc) {
+        /* CG */
+        fprintf(stderr, "memcached warning w.r.t ingot: preallocation is being "
+                        "used - we do not provide support for this mode of "
+                        "operation.\n");
+        exit(1);
 #if defined(__linux__) && defined(MADV_HUGEPAGE)
         mem_base = alloc_large_chunk_linux(mem_limit);
         if (mem_base)
@@ -605,13 +620,20 @@ static void do_slabs_stats(ADD_STAT add_stats, void *c) {
     add_stats(NULL, 0, NULL, 0, c);
 }
 
+/* CG: My allocation trial */
 static void *memory_allocate(size_t size) {
     void *ret;
 
     if (mem_base == NULL) {
         /* We are not using a preallocated large memory chunk */
-        ret = malloc(size);
+        ret = persistent_alloc(size, PT_item, pmregion);
     } else {
+        /* CG */
+        fprintf(stderr, "memcached warning w.r.t ingot: preallocation is being "
+                        "used - we do not provide support for this mode of "
+                        "operation.\n");
+        exit(1);
+
         ret = mem_current;
 
         if (size > mem_avail) {
@@ -1199,6 +1221,9 @@ static void slab_rebalance_finish(void) {
  * Sits waiting for a condition to jump off and shovel some memory about
  */
 static void *slab_rebalance_thread(void *arg) {
+    /* CG */
+    ingot_init_thread();
+
     int was_busy = 0;
     /* So we first pass into cond_wait with the mutex held */
     mutex_lock(&slabs_rebalance_lock);
@@ -1225,7 +1250,9 @@ static void *slab_rebalance_thread(void *arg) {
 
         if (slab_rebalance_signal == 0) {
             /* always hold this lock while we're running */
+            nvm_release(&slabs_rebalance_lock);
             pthread_cond_wait(&slab_rebalance_cond, &slabs_rebalance_lock);
+            nvm_acquire(&slabs_rebalance_lock);
         }
     }
     return NULL;

@@ -13,6 +13,7 @@
 
 #include "memcached.h"
 #include "bipbuffer.h"
+#include "persist.h"
 
 #ifdef LOGGER_DEBUG
 #define L_DEBUG(...) \
@@ -502,6 +503,9 @@ static void logger_thread_sum_stats(struct logger_stats *ls) {
 
 /* Primary logger thread routine */
 static void *logger_thread(void *arg) {
+    /* CG */
+    ingot_init_thread();
+
     useconds_t to_sleep = MIN_LOGGER_SLEEP;
     L_DEBUG("LOGGER: Starting logger thread\n");
     while (do_run_logger_thread) {
