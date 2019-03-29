@@ -7646,7 +7646,6 @@ int main (int argc, char **argv) {
     /* CG: This seems like a good place to start off instrumenting everything.
     Copies code from server.c in ingot-redis */
     int is_created;
-    uint32_t pmregion;
 
     NVM_Initialize();
     pmregion = NVM_FindOrCreateRegion("persistent-mem", O_RDWR, &is_created);

@@ -17,8 +17,8 @@ enum {
         PT_sdsOld,
     PT_robj,
     -----------------------*/
-    PT_serverRoot,
-    PT_item
+    PT_item = 1,
+    PT_serverRoot
 };
 
 extern int pmregion;
