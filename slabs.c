@@ -782,10 +782,6 @@ static int slab_rebalance_start(void) {
 
     s_cls = &slabclass[slab_rebal.s_clsid];
 
-    if (!grow_slab_list(slab_rebal.d_clsid)) {
-        no_go = -1;
-    }
-
     if (s_cls->slabs < 2)
         no_go = -3;
 
@@ -1132,7 +1128,6 @@ static int slab_rebalance_move(void) {
 
 static void slab_rebalance_finish(void) {
     slabclass_t *s_cls;
-    slabclass_t *d_cls;
     int x;
     uint32_t rescues;
     uint32_t evictions_nomem;
@@ -1143,7 +1138,6 @@ static void slab_rebalance_finish(void) {
     pthread_mutex_lock(&slabs_lock);
 
     s_cls = &slabclass[slab_rebal.s_clsid];
-    d_cls = &slabclass[slab_rebal.d_clsid];
 
 #ifdef DEBUG_SLAB_MOVER
     /* If the algorithm is broken, live items can sneak in. */
@@ -1168,17 +1162,7 @@ static void slab_rebalance_finish(void) {
         s_cls->slab_list[x] = s_cls->slab_list[x+1];
     }
 
-    d_cls->slab_list[d_cls->slabs++] = slab_rebal.slab_start;
-    /* Don't need to split the page into chunks if we're just storing it */
-    if (slab_rebal.d_clsid > SLAB_GLOBAL_PAGE_POOL) {
-        memset(slab_rebal.slab_start, 0, (size_t)settings.slab_page_size);
-        split_slab_page_into_freelist(slab_rebal.slab_start,
-            slab_rebal.d_clsid);
-    } else if (slab_rebal.d_clsid == SLAB_GLOBAL_PAGE_POOL) {
-        /* mem_malloc'ed might be higher than mem_limit. */
-        mem_limit_reached = false;
-        memory_release();
-    }
+    free(slab_rebal.slab_start);
 
     slab_rebal.busy_loops = 0;
     slab_rebal.done       = 0;
