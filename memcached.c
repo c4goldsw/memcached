@@ -7671,13 +7671,9 @@ int main (int argc, char **argv) {
         nvm_begin_durable();
         root_ptr = persistent_alloc(sizeof(root_ptr), PT_serverRoot, pmregion);
         NVM_SetRegionRoot(pmregion, root_ptr);
+        nvm_end_durable();
     } else {
         root_ptr = NVM_GetRegionRoot(pmregion);
-    }
-
-    /* CG: end persistent allocations */
-    if(is_created) {
-        nvm_end_durable();
     }
 
     /* initialize other stuff */
