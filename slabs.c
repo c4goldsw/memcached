@@ -1162,6 +1162,9 @@ static void slab_rebalance_finish(void) {
         s_cls->slab_list[x] = s_cls->slab_list[x+1];
     }
 
+    // CG: This is my slab hack - at this point, you would normally assign
+    // the slab class to it's destination, but I'm just going to dump it for
+    // the sake of ease.
     free(slab_rebal.slab_start);
 
     slab_rebal.busy_loops = 0;
