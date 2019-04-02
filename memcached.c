@@ -6953,6 +6953,7 @@ int main (int argc, char **argv) {
             settings.prefix_delimiter = optarg[0];
             settings.detail_enabled = 1;
             break;
+        /* CG: We don't want preallocation, as it won't work with Ingot.
         case 'L' :
             if (enable_large_pages() == 0) {
                 preallocate = true;
@@ -6962,6 +6963,7 @@ int main (int argc, char **argv) {
                 return 1;
             }
             break;
+        */
         case 'C' :
             settings.use_cas = false;
             break;
