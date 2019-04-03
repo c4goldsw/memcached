@@ -187,7 +187,8 @@ if test "x$enable_dtrace" = "xyes"; then
 fi
 
 if test "x$enable_extstore" = "xyes"; then
-    AC_DEFINE([EXTSTORE],1,[Set to nonzero if you want to enable extstore])
+    AC_MSG_ERROR([Ingot Error: we don't support extstore - it invalidates the purpose of using NVM.])
+    #AC_DEFINE([EXTSTORE],1,[Set to nonzero if you want to enable extstore])
 fi
 
 if test "x$enable_arm_crc32" = "xyes"; then
