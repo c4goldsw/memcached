@@ -247,6 +247,7 @@ void slabs_init(const size_t limit, const double factor, const bool prealloc,
 }
 
 void slabs_prefill_global(void) {
+    /*
     void *ptr;
     slabclass_t *p = &slabclass[0];
     int len = settings.slab_page_size;
@@ -257,6 +258,7 @@ void slabs_prefill_global(void) {
         p->slab_list[p->slabs++] = ptr;
     }
     mem_limit_reached = true;
+    */
 }
 
 static void slabs_preallocate (const unsigned int maxslabs) {
