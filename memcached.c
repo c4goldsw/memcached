@@ -6459,6 +6459,7 @@ static int sigignore(int sig) {
  * On systems that supports multiple page sizes we may reduce the
  * number of TLB-misses by using the biggest available page size
  */
+/* CG: Disabling, as we don't need this.
 static int enable_large_pages(void) {
 #if defined(HAVE_GETPAGESIZES) && defined(HAVE_MEMCNTL)
     int ret = -1;
@@ -6493,9 +6494,9 @@ static int enable_large_pages(void) {
     }
 
     return ret;
-#elif defined(__linux__) && defined(MADV_HUGEPAGE)
+#elif defined(__linux__) && defined(MADV_HUGEPAGE)*/
     /* check if transparent hugepages is compiled into the kernel */
-    struct stat st;
+    /*struct stat st;
     int ret = stat("/sys/kernel/mm/transparent_hugepage/enabled", &st);
     if (ret || !(st.st_mode & S_IFREG)) {
         fprintf(stderr, "Transparent huge pages support not detected.\n");
@@ -6506,7 +6507,7 @@ static int enable_large_pages(void) {
 #else
     return -1;
 #endif
-}
+}*/
 
 /**
  * Do basic sanity check of the runtime environment
