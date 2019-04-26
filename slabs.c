@@ -74,7 +74,7 @@ static pthread_mutex_t slabs_rebalance_lock = PTHREAD_MUTEX_INITIALIZER;
  */
 static int grow_slab_list (const unsigned int id);
 static int do_slabs_newslab(const unsigned int id);
-static void *memory_allocate(size_t size);
+static void *memory_allocate(size_t size, size_t class_item_size);
 static void do_slabs_free(void *ptr, const size_t size, unsigned int id);
 
 /* Preallocate as many slab pages as possible (called from slabs_init)
@@ -330,7 +330,7 @@ static int do_slabs_newslab(const unsigned int id) {
 
     if ((grow_slab_list(id) == 0) ||
         (((ptr = get_page_from_global_pool()) == NULL) &&
-        ((ptr = memory_allocate((size_t)len)) == 0))) {
+        ((ptr = memory_allocate((size_t)len, p->size)) == 0))) {
 
         MEMCACHED_SLABS_SLABCLASS_ALLOCATE_FAILED(id);
         return 0;
@@ -621,12 +621,12 @@ static void do_slabs_stats(ADD_STAT add_stats, void *c) {
 }
 
 /* CG: My allocation trial */
-static void *memory_allocate(size_t size) {
+static void *memory_allocate(size_t size, size_t class_item_size) {
     void *ret;
 
     if (mem_base == NULL) {
         /* We are not using a preallocated large memory chunk */
-        ret = persistent_alloc(size, PT_item, pmregion);
+        ret = persistent_var_size_alloc(size, class_item_size - sizeof(item), PT_item | PT_ARRAY, pmregion);
     } else {
         /* CG */
         fprintf(stderr, "memcached warning w.r.t ingot: preallocation is being "
@@ -1165,7 +1165,7 @@ static void slab_rebalance_finish(void) {
     // CG: This is my slab hack - at this point, you would normally assign
     // the slab class to it's destination, but I'm just going to dump it for
     // the sake of ease.
-    free(slab_rebal.slab_start);
+    persistent_free(slab_rebal.slab_start);
 
     slab_rebal.busy_loops = 0;
     slab_rebal.done       = 0;
