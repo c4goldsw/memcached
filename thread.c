@@ -111,6 +111,7 @@ void item_lock(uint32_t hv) {
 void *item_trylock(uint32_t hv) {
     pthread_mutex_t *lock = &item_locks[hv & hashmask(item_lock_hashpower)];
     if (pthread_mutex_trylock(lock) == 0) {
+        nvm_acquire(lock);
         return lock;
     }
     return NULL;

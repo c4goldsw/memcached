@@ -1304,6 +1304,8 @@ enum reassign_result_type slabs_reassign(int src, int dst) {
     if (pthread_mutex_trylock(&slabs_rebalance_lock) != 0) {
         return REASSIGN_RUNNING;
     }
+    nvm_acquire(&slabs_rebalance_lock);
+
     ret = do_slabs_reassign(src, dst);
     pthread_mutex_unlock(&slabs_rebalance_lock);
     return ret;
