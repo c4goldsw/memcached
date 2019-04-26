@@ -406,6 +406,8 @@ static void setup_thread(LIBEVENT_THREAD *me) {
 static void *worker_libevent(void *arg) {
     LIBEVENT_THREAD *me = arg;
 
+    ingot_init_thread();
+
     /* Any per-thread setup can happen here; memcached_thread_init() will block until
      * all threads have finished initializing.
      */
